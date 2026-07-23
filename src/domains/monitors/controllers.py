@@ -1,33 +1,51 @@
+from typing import Any
 from uuid import UUID
-from litestar import Controller, get, post
-from sqlalchemy.ext.asyncio import AsyncSession
+from litestar import Controller, delete, get, post
+from dishka.integrations.litestar import FromDishka, inject
 
-from src.domains.monitors.models import TargetSite
-from src.domains.monitors.schemas import CreateMonitorDTO, MonitorResponseDTO
+from src.domains.monitors.schemas import (
+    CreateMonitorDTO,
+    MonitorResponseDTO,
+)
 from src.domains.monitors.service import MonitorService
 
 
 class MonitorController(Controller):
     path = "/api/v1/monitors"
 
-    @post("/")
-    async def create_monitor(
-        self, data: CreateMonitorDTO, db_session: AsyncSession
-    ) -> MonitorResponseDTO:
-        #Добавление нового сайта на мониторинг
-        site = TargetSite(
-            name=data.name, 
-            url=str(data.url), 
-            interval_seconds=data.interval_seconds
-        )
-        db_session.add(site)
-        await db_session.commit()
-        return site
-
     @get("/{site_id:uuid}/stats")
-    async def get_monitor_stats(
-        self, site_id: UUID, db_session: AsyncSession, hours: int = 24
-    ) -> dict:
-        #Получение статистики аптайма и пинга
-        service = MonitorService(db_session)
-        return await service.get_site_metrics(site_id=site_id, hours=hours)
+    @inject
+    async def get_stats(
+        self,
+        site_id: UUID,
+        service: FromDishka[MonitorService],
+    ) -> dict[str, Any]:
+        return await service.get_site_metrics(site_id)
+
+    @post("/")
+    @inject
+    async def create_monitor(
+        self,
+        data: CreateMonitorDTO,
+        service: FromDishka[MonitorService],
+    ) -> MonitorResponseDTO:
+        site = await service.create_site(data)
+        return MonitorResponseDTO.model_validate(site)
+
+    @get("/")
+    @inject
+    async def list_monitors(
+        self,
+        service: FromDishka[MonitorService],
+    ) -> list[MonitorResponseDTO]:
+        sites = await service.get_all_sites()
+        return [MonitorResponseDTO.model_validate(site) for site in sites]
+
+    @delete("/{site_id:uuid}")
+    @inject
+    async def delete_monitor(
+        self,
+        site_id: UUID,
+        service: FromDishka[MonitorService],
+    ) -> None:
+        await service.delete_site(site_id)

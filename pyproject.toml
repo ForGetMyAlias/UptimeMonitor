@@ -10,4 +10,5 @@ dependencies = [
     "uvicorn>=0.29.0",
     "sqlalchemy>=2.0.51",
     "aiosqlite>=0.22.1",
+    "dishka>=1.10.1",
 ]
