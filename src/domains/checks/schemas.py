@@ -1,8 +1,10 @@
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict
 
 class CheckResultResponseDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     site_id: UUID
     status_code: int | None = None
